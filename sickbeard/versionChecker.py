@@ -216,7 +216,8 @@ class GitUpdateManager(UpdateManager):
         self._newest_commit_hash = None
         self._num_commits_behind = 0
 
-        self.git_url = 'http://code.google.com/p/sickbeard/downloads/list'
+        self.github_username = 'dzerovibe'
+        self.github_repository = 'Sick-Beard'
 
         self.branch = self._find_git_branch()
 
@@ -315,7 +316,7 @@ class GitUpdateManager(UpdateManager):
         gh = github.GitHub()
 
         # find newest commit
-        for curCommit in gh.commits('mr-orange', 'Sick-Beard', version.SICKBEARD_VERSION):
+        for curCommit in gh.commits(self.github_username, self.github_repository, self.branch):
 
             if not self._newest_commit_hash:
                 self._newest_commit_hash = curCommit['sha']
@@ -344,9 +345,9 @@ class GitUpdateManager(UpdateManager):
             return
 
         if self._newest_commit_hash:
-            url = 'http://github.com/mr-orange/Sick-Beard/compare/'+self._cur_commit_hash+'...'+self._newest_commit_hash
+            url = 'http://github.com/' + self.github_username + '/' + self.github_repository + '/compare/'+self._cur_commit_hash+'...'+self._newest_commit_hash
         else:
-            url = 'http://github.com/mr-orange/Sick-Beard/commits/'
+            url = 'http://github.com/' + self.github_username + '/' + self.github_repository + '/commits/'
 
         new_str = 'There is a <a class="update" href="'+url+'" onclick="window.open(this.href); return false;">newer version available</a> ('+message+')'
         new_str += "&mdash; <a class=""update"" href=\""+self.get_update_url()+"\">Update Now</a>"
@@ -452,7 +453,7 @@ class SourceUpdateManager(GitUpdateManager):
         Downloads the latest source tarball from github and installs it over the existing version.
         """
 
-        tar_download_url = 'https://github.com/mr-orange/Sick-Beard/tarball/'+version.SICKBEARD_VERSION
+        tar_download_url = 'https://github.com/' + self.github_username + '/' + self.github_repository + '/tarball/' + self.branch
         sb_update_dir = os.path.join(sickbeard.PROG_DIR, 'sb-update')
         version_path = os.path.join(sickbeard.PROG_DIR, 'version.txt')
 
