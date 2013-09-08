@@ -38,6 +38,8 @@ from sickbeard.common import SNATCHED, SNATCHED_PROPER, DOWNLOADED, SKIPPED, UNA
 from common import Quality, qualityPresetStrings, statusStrings
 from sickbeard import image_cache
 from lib.tvdb_api import tvdb_api, tvdb_exceptions
+from sickbeard import postProcessor
+from sickbeard.name_parser.parser import InvalidNameException 
 try:
     import json
 except ImportError:
@@ -1677,6 +1679,28 @@ class CMD_SickBeardShutdown(ApiCall):
         threading.Timer(2, sickbeard.invoke_shutdown).start()
         return _responds(RESULT_SUCCESS, msg="SickBeard is shutting down...")
 
+class CMD_SickBeardAnalyzeName(ApiCall):
+    _help = {"desc": "takes a name and tries to figure out a show, season and episode from it.",
+            "requiredParameters": {"name": {"desc": "the name to lookup"}}
+            }
+
+    def __init__(self, args, kwargs):
+        # required
+        self.name, args = self.check_params(args, kwargs, "name", None, True, "string", [])
+        # optional
+        # super, missing, help
+        ApiCall.__init__(self, args, kwargs)
+
+    def run(self):
+        processor = postProcessor.PostProcessor('', self.name)
+        try:
+            analyzed_name = processor._analyze_name(self.name, file=False)
+        except InvalidNameException, e:
+            logger.log(u"API :: SickBeardAnalyzeName :: NameParser failed with InvalidNameException: "+ repr(e), logger.DEBUG)
+            return _responds(RESULT_FAILURE, msg=ex(e))
+        return _responds(RESULT_SUCCESS, data={'tvdbid': analyzed_name[0],
+                                                'season':  analyzed_name[1],
+                                                'episodes': analyzed_name[2]})
 
 class CMD_Show(ApiCall):
     _help = {"desc": "display information for a given show",
@@ -2315,7 +2339,7 @@ class CMD_ShowStats(ApiCall):
             episode_qualities_counts_snatch[statusCode] = 0
 
         myDB = db.DBConnection(row_type="dict")
-        sqlResults = myDB.select("SELECT status, season FROM tv_episodes WHERE showid = ?", [self.tvdbid])
+        sqlResults = myDB.select("SELECT status, season FROM tv_episodes WHERE season != 0 AND showid = ?", [self.tvdbid])
         # the main loop that goes through all episodes
         for row in sqlResults:
             status, quality = Quality.splitCompositeStatus(int(row["status"]))
@@ -2430,19 +2454,19 @@ class CMD_Shows(ApiCall):
                         "quality": _get_quality_string(curShow.quality),
                         "language": curShow.lang,
                         "air_by_date": curShow.air_by_date,
+                        "tvdbid": curShow.tvdbid,
                         "tvrage_id": curShow.tvrid,
                         "tvrage_name": curShow.tvrname,
                         "network": curShow.network,
+                        "show_name": curShow.name,
                         "status": curShow.status,
                         "next_ep_airdate": nextAirdate}
             showDict["cache"] = CMD_ShowCache((), {"tvdbid": curShow.tvdbid}).run()["data"]
             if not showDict["network"]:
                 showDict["network"] = ""
             if self.sort == "name":
-                showDict["tvdbid"] = curShow.tvdbid
                 shows[curShow.name] = showDict
             else:
-                showDict["show_name"] = curShow.name
                 shows[curShow.tvdbid] = showDict
         return _responds(RESULT_SUCCESS, shows)
 
@@ -2466,8 +2490,7 @@ class CMD_ShowsStats(ApiCall):
         stats["shows_total"] = len(sickbeard.showList)
         stats["shows_active"] = len([show for show in sickbeard.showList if show.paused == 0 and show.status != "Ended"])
         stats["ep_downloaded"] = myDB.select("SELECT COUNT(*) FROM tv_episodes WHERE status IN (" + ",".join([str(show) for show in Quality.DOWNLOADED + [ARCHIVED]]) + ") AND season != 0 and episode != 0 AND airdate <= " + today + "")[0][0]
-        stats["ep_total"] = myDB.select("SELECT COUNT(*) FROM tv_episodes WHERE season != 0 and episode != 0 AND (airdate != 1 OR status IN (" + ",".join([str(show) for show in (Quality.DOWNLOADED + Quality.SNATCHED + Quality.SNATCHED_PROPER) + [ARCHIVED]]) + ")) AND airdate <= " + today + " AND status != " + str(IGNORED) + "")[0][0]
-
+        stats["ep_total"] = myDB.select("SELECT COUNT(*) FROM tv_episodes WHERE season != 0 AND episode != 0 AND (airdate != 1 OR status IN (" + ",".join([str(show) for show in (Quality.DOWNLOADED + Quality.SNATCHED + Quality.SNATCHED_PROPER) + [ARCHIVED]]) + ")) AND airdate <= " + today + " AND status != " + str(IGNORED) + "")[0][0]
         myDB.connection.close()
         return _responds(RESULT_SUCCESS, stats)
 
@@ -2501,6 +2524,7 @@ _functionMaper = {"help": CMD_Help,
                   "sb.searchtvdb": CMD_SickBeardSearchTVDB,
                   "sb.setdefaults": CMD_SickBeardSetDefaults,
                   "sb.shutdown": CMD_SickBeardShutdown,
+                  "sb.analyzename": CMD_SickBeardAnalyzeName,
                   "show": CMD_Show,
                   "show.addexisting": CMD_ShowAddExisting,
                   "show.addnew": CMD_ShowAddNew,
