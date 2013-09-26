@@ -154,16 +154,16 @@ class PostProcessor(object):
             return []
 
         file_path_list = []
-
+    
         base_name = file_path.rpartition('.')[0]+'.'
         
         # don't strip it all and use cwd by accident
         if not base_name:
             return []
-
+        
         # don't confuse glob with chars we didn't mean to use
         base_name = re.sub(r'[\[\]\*\?]', r'[\g<0>]', base_name)
-
+    
         for associated_file_path in ek.ek(glob.glob, base_name+'*'):
             # only add associated to list
             if associated_file_path == file_path:
@@ -243,7 +243,7 @@ class PostProcessor(object):
         if not file_list:
             self._log(u"There were no files associated with " + file_path + ", not moving anything", logger.DEBUG)
             return
-
+        
         # create base name with file_path (media_file without .extension)
         old_base_name = file_path.rpartition('.')[0]
         old_base_name_length = len(old_base_name)
@@ -930,8 +930,10 @@ class PostProcessor(object):
 
         # download subtitles
         if sickbeard.USE_SUBTITLES and ep_obj.show.subtitles:
-            cur_ep.location = ek.ek(os.path.join, dest_path, new_file_name)
-            cur_ep.downloadSubtitles(force=True)
+            for curEp in [ep_obj]:
+                with cur_ep.lock:
+                    cur_ep.location = ek.ek(os.path.join, dest_path, new_file_name)
+                    cur_ep.downloadSubtitles(force=True)
 
         # put the new location in the database
         for cur_ep in [ep_obj] + ep_obj.relatedEps:
