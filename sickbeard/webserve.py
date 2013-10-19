@@ -740,6 +740,7 @@ class Manage:
     def manageTorrents(self):
 
         t = PageTemplate(file="manage_torrents.tmpl")
+        t.info_download_station = ''
         t.submenu = ManageMenu
         
         if re.search('localhost', sickbeard.TORRENT_HOST):
@@ -753,6 +754,11 @@ class Manage:
 
         if sickbeard.TORRENT_METHOD == 'utorrent':
             t.webui_url = '/'.join(s.strip('/') for s in (t.webui_url, 'gui/'))
+        if sickbeard.TORRENT_METHOD == 'download_station': 
+            if helpers.check_url(t.webui_url + 'download/'):
+                t.webui_url = t.webui_url + 'download/'
+            else:
+                t.info_download_station = '<p>To have a better experience please set the Download Station alias as <code>download</code>, you can check this setting in the Synology DSM <b>Control Panel</b> > <b>Application Portal</b>. Make sure you allow DSM to be embedded with iFrames too in <b>Control Panel</b> > <b>DSM Settings</b> > <b>Security</b>.</p><br/><p>There is more information about this available <a href="https://github.com/mr-orange/Sick-Beard/pull/338">here</a>.</p><br/>' 
             
         return _munge(t)
         
@@ -2184,12 +2190,22 @@ class HomePostProcess:
         return _munge(t)
 
     @cherrypy.expose
-    def processEpisode(self, dir=None, nzbName=None, jobName=None, quiet=None):
+    def processEpisode(self, dir=None, nzbName=None, jobName=None, quiet=None, process_method=None, force=None, is_priority=None):
+
+        if force=="on":
+            force=True
+        else:
+            force=False
+            
+        if is_priority =="on":
+            is_priority = True
+        else:
+            is_priority = False
 
         if not dir:
             redirect("/home/postprocess")
         else:
-            result = processTV.processDir(dir, nzbName)
+            result = processTV.processDir(dir, nzbName, process_method=process_method, force=force, is_priority=is_priority)
             if quiet != None and int(quiet) == 1:
                 return result
 

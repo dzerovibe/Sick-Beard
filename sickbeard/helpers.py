@@ -31,6 +31,8 @@ import urllib
 import urllib2
 import zlib
 import hashlib
+import httplib
+import urlparse
 
 from httplib import BadStatusLine
 
@@ -106,7 +108,7 @@ def replaceExtension(filename, newExt):
 
 def isMediaFile(filename):
     # ignore samples
-    if re.search('(^|[\W_])(sample\d*|extra)[\W_]', filename, re.I):
+    if re.search('(^|[\W_])(sample\d*)[\W_]', filename, re.I):
         return False
 
     # ignore MAC OS's retarded "resource fork" files
@@ -114,6 +116,10 @@ def isMediaFile(filename):
         return False
 
     sepFile = filename.rpartition(".")
+    
+    if re.search('extras?$', sepFile[0], re.I):
+        return False
+        
     if sepFile[2].lower() in mediaExtensions:
         return True
     else:
@@ -965,4 +971,19 @@ def get_lan_ip():
                 pass
     return ip
 
-    
+def check_url(url):
+    """
+    Check if a URL exists without downloading the whole file.
+    We only check the URL header.
+    """
+    # see also http://stackoverflow.com/questions/2924422
+    # http://stackoverflow.com/questions/1140661
+    good_codes = [httplib.OK, httplib.FOUND, httplib.MOVED_PERMANENTLY]
+
+    host, path = urlparse.urlparse(url)[1:3]    # elems [1] and [2]
+    try:
+        conn = httplib.HTTPConnection(host)
+        conn.request('HEAD', path)
+        return conn.getresponse().status in good_codes
+    except StandardError:
+        return None
