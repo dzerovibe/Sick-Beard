@@ -950,6 +950,13 @@ class PostProcessor(object):
                     cur_ep.location = ek.ek(os.path.join, dest_path, new_file_name)
                     cur_ep.downloadSubtitles(force=True)
 
+        # Update the modification timestamp for the show folder
+        show_absolute_path = ek.ek(os.path.join, ep_obj.show.location)
+        try:
+            os.utime(show_absolute_path, None)
+        except (OSError, IOError), e:
+            self._log(u'Failed to update the modification timestamp for ' + show_absolute_path + ' : ' + ex(e))
+
         # put the new location in the database
         for cur_ep in [ep_obj] + ep_obj.relatedEps:
             with cur_ep.lock:
