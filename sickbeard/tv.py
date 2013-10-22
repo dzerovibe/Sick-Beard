@@ -570,6 +570,11 @@ class TVShow(object):
             with curEp.lock:
                 curEp.saveToDB()
 
+        # creating metafiles on the root should be good enough
+        if sickbeard.USE_FAILED_DOWNLOADS and rootEp is not None:
+            with rootEp.lock:
+                rootEp.createMetaFiles()
+
         return rootEp
 
     def loadFromDB(self, skipNFO=False):
@@ -1785,7 +1790,7 @@ class TVEpisode(object):
                     sep = ' '
 
                 # force 2-3-4 format if they chose to extend
-                if multi in (NAMING_EXTEND, NAMING_LIMITED_EXTEND):
+                if multi in (NAMING_EXTEND, NAMING_LIMITED_EXTEND, NAMING_LIMITED_EXTEND_E_PREFIXED):
                     ep_sep = '-'
 
                 regex_used = season_ep_regex
@@ -1810,7 +1815,7 @@ class TVEpisode(object):
             for other_ep in self.relatedEps:
                 
                 # for limited extend we only append the last ep
-                if multi == NAMING_LIMITED_EXTEND and other_ep != self.relatedEps[-1]:
+                if multi in (NAMING_LIMITED_EXTEND, NAMING_LIMITED_EXTEND_E_PREFIXED) and other_ep != self.relatedEps[-1]:
                     continue
 
                 elif multi == NAMING_DUPLICATE:
