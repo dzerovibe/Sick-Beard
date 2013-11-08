@@ -47,8 +47,6 @@ from lib.configobj import ConfigObj
 
 invoked_command = None
 
-SOCKET_TIMEOUT = 30
-
 PID = None
 
 CFG = None
@@ -97,6 +95,8 @@ started = False
 
 ACTUAL_LOG_DIR = None
 LOG_DIR = None
+
+SOCKET_TIMEOUT = None
 
 WEB_PORT = None
 WEB_LOG = None
@@ -384,6 +384,7 @@ EMAIL_LIST = None
 
 GUI_NAME = None
 HOME_LAYOUT = None
+HISTORY_LAYOUT = None
 DISPLAY_SHOW_SPECIALS = None
 COMING_EPS_LAYOUT = None
 COMING_EPS_DISPLAY_PAUSED = None
@@ -452,14 +453,12 @@ def initialize(consoleLogging=True):
                 USE_EMAIL, EMAIL_HOST, EMAIL_PORT, EMAIL_TLS, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM, EMAIL_NOTIFY_ONSNATCH, EMAIL_NOTIFY_ONDOWNLOAD, EMAIL_NOTIFY_ONSUBTITLEDOWNLOAD, EMAIL_LIST, \
                 USE_BANNER, USE_LISTVIEW, METADATA_XBMC, METADATA_XBMC_V12, METADATA_MEDIABROWSER, METADATA_PS3, METADATA_SYNOLOGY, METADATA_MEDE8ER, metadata_provider_dict, \
                 NEWZBIN, NEWZBIN_USERNAME, NEWZBIN_PASSWORD, GIT_PATH, MOVE_ASSOCIATED_FILES, \
-                GUI_NAME, HOME_LAYOUT, DISPLAY_SHOW_SPECIALS, COMING_EPS_LAYOUT, COMING_EPS_SORT, COMING_EPS_DISPLAY_PAUSED, COMING_EPS_MISSED_RANGE, METADATA_WDTV, METADATA_TIVO, IGNORE_WORDS, CREATE_MISSING_SHOW_DIRS, \
+                GUI_NAME, HOME_LAYOUT, HISTORY_LAYOUT, DISPLAY_SHOW_SPECIALS, COMING_EPS_LAYOUT, COMING_EPS_SORT, COMING_EPS_DISPLAY_PAUSED, COMING_EPS_MISSED_RANGE, METADATA_WDTV, METADATA_TIVO, IGNORE_WORDS, CREATE_MISSING_SHOW_DIRS, \
                 ADD_SHOWS_WO_DIR, USE_SUBTITLES, SUBTITLES_LANGUAGES, SUBTITLES_DIR, SUBTITLES_SERVICES_LIST, SUBTITLES_SERVICES_ENABLED, SUBTITLES_HISTORY, subtitlesFinderScheduler, \
                 USE_FAILED_DOWNLOADS, DELETE_FAILED, TREAT_EMPTY_AS_FAILED, ANON_REDIRECT, LOCALHOST_IP
 
         if __INITIALIZED__:
             return False
-
-        socket.setdefaulttimeout(SOCKET_TIMEOUT)
 
         CheckSection(CFG, 'General')
         CheckSection(CFG, 'Blackhole')
@@ -486,7 +485,10 @@ def initialize(consoleLogging=True):
         
         if not helpers.makeDir(LOG_DIR):
             logger.log(u"!!! No log folder, logging to screen only!", logger.ERROR)
-
+        
+        SOCKET_TIMEOUT = check_setting_int(CFG, 'General', 'socket_timeout', 30)
+        socket.setdefaulttimeout(SOCKET_TIMEOUT)
+        
         try:
             WEB_PORT = check_setting_int(CFG, 'General', 'web_port', 8081)
         except:
@@ -502,6 +504,7 @@ def initialize(consoleLogging=True):
         WEB_USERNAME = check_setting_str(CFG, 'General', 'web_username', '')
         WEB_PASSWORD = check_setting_str(CFG, 'General', 'web_password', '')
         LAUNCH_BROWSER = bool(check_setting_int(CFG, 'General', 'launch_browser', 1))
+        
         
         LOCALHOST_IP = check_setting_str(CFG, 'General', 'localhost_ip', '')
         ANON_REDIRECT = check_setting_str(CFG, 'General', 'anon_redirect', 'http://derefer.me/?')
@@ -904,6 +907,7 @@ def initialize(consoleLogging=True):
         GUI_NAME = check_setting_str(CFG, 'GUI', 'gui_name', 'slick')
 
         HOME_LAYOUT = check_setting_str(CFG, 'GUI', 'home_layout', 'poster')
+        HISTORY_LAYOUT = check_setting_str(CFG, 'GUI', 'history_layout', 'detailed')
         DISPLAY_SHOW_SPECIALS = bool(check_setting_int(CFG, 'GUI', 'display_show_specials', 1))
         COMING_EPS_LAYOUT = check_setting_str(CFG, 'GUI', 'coming_eps_layout', 'banner')
         COMING_EPS_DISPLAY_PAUSED = bool(check_setting_int(CFG, 'GUI', 'coming_eps_display_paused', 0))
@@ -980,7 +984,7 @@ def initialize(consoleLogging=True):
             autoPostProcesserScheduler.silent = True
             
         traktWatchListCheckerSchedular = scheduler.Scheduler(traktWatchListChecker.TraktChecker(),
-                                                     cycleTime=datetime.timedelta(minutes=10),
+                                                     cycleTime=datetime.timedelta(hours=1),
                                                      threadName="TRAKTWATCHLIST",
                                                      runImmediately=True)
         
@@ -1195,6 +1199,7 @@ def saveAndShutdown(restart=False):
             if '--nolaunch' not in popen_list:
                 popen_list += ['--nolaunch']
             logger.log(u"Restarting Sick Beard with " + str(popen_list))
+            logger.close()
             subprocess.Popen(popen_list, cwd=os.getcwd())
 
     os._exit(0)
@@ -1237,6 +1242,7 @@ def save_config():
     new_config['General'] = {}
     new_config['General']['config_version'] = CONFIG_VERSION
     new_config['General']['log_dir'] = ACTUAL_LOG_DIR if ACTUAL_LOG_DIR else 'Logs'
+    new_config['General']['socket_timeout'] = SOCKET_TIMEOUT
     new_config['General']['web_port'] = WEB_PORT
     new_config['General']['web_host'] = WEB_HOST
     new_config['General']['web_ipv6'] = int(WEB_IPV6)
@@ -1293,8 +1299,8 @@ def save_config():
     new_config['General']['process_automatically'] = int(PROCESS_AUTOMATICALLY)
     new_config['General']['unpack'] = int(UNPACK)
     new_config['General']['rename_episodes'] = int(RENAME_EPISODES)
-    new_config['General']['create_missing_show_dirs'] = CREATE_MISSING_SHOW_DIRS
-    new_config['General']['add_shows_wo_dir'] = ADD_SHOWS_WO_DIR
+    new_config['General']['create_missing_show_dirs'] = int(CREATE_MISSING_SHOW_DIRS)
+    new_config['General']['add_shows_wo_dir'] = int(ADD_SHOWS_WO_DIR)
 
     new_config['General']['extra_scripts'] = '|'.join(EXTRA_SCRIPTS)
     new_config['General']['git_path'] = GIT_PATH
@@ -1346,7 +1352,7 @@ def save_config():
 
     new_config['PUBLICHD'] = {}
     new_config['PUBLICHD']['publichd'] = int(PUBLICHD)
-    new_config['PUBLICHD']['publichd'] = PUBLICHD_OPTIONS
+    new_config['PUBLICHD']['publichd_options'] = PUBLICHD_OPTIONS
 
     new_config['SCC'] = {}
     new_config['SCC']['scc'] = int(SCC)
@@ -1555,6 +1561,7 @@ def save_config():
     new_config['GUI'] = {}
     new_config['GUI']['gui_name'] = GUI_NAME
     new_config['GUI']['home_layout'] = HOME_LAYOUT
+    new_config['GUI']['history_layout'] = HISTORY_LAYOUT
     new_config['GUI']['display_show_specials'] = int(DISPLAY_SHOW_SPECIALS)
     new_config['GUI']['coming_eps_layout'] = COMING_EPS_LAYOUT
     new_config['GUI']['coming_eps_display_paused'] = int(COMING_EPS_DISPLAY_PAUSED)
